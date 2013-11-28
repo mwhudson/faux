@@ -141,6 +141,7 @@ func (c buildCompiler) Set(value string) error {
 	default:
 		return fmt.Errorf("unknown compiler %q", value)
 	}
+	buildToolchain.init()
 	buildContext.Compiler = value
 	return nil
 }
@@ -336,7 +337,7 @@ func runInstall(cmd *Command, args []string) {
 var (
 	goarch    string
 	goos      string
-	archChar  string
+	archChar  string // set in (gcToolchain).init() if needed
 	exeSuffix string
 )
 
@@ -345,11 +346,6 @@ func init() {
 	goos = buildContext.GOOS
 	if goos == "windows" {
 		exeSuffix = ".exe"
-	}
-	var err error
-	archChar, err = build.ArchChar(goarch)
-	if err != nil {
-		fatalf("%s", err)
 	}
 }
 
@@ -1429,6 +1425,8 @@ func mkAbs(dir, f string) string {
 }
 
 type toolchain interface {
+	init()
+
 	// gc runs the compiler in a specific directory on a set of files
 	// and returns the name of the generated output file.
 	// The compiler runs in the directory dir.
@@ -1457,6 +1455,10 @@ type noToolchain struct{}
 func noCompiler() error {
 	log.Fatalf("unknown compiler %q", buildContext.Compiler)
 	return nil
+}
+
+func (noToolchain) init() {
+	noCompiler()
 }
 
 func (noToolchain) compiler() string {
@@ -1496,6 +1498,14 @@ func (noToolchain) cc(b *builder, p *Package, objdir, ofile, cfile string) error
 
 // The Go toolchain.
 type gcToolchain struct{}
+
+func (gcToolchain) init() {
+	var err error
+	archChar, err = build.ArchChar(goarch)
+	if err != nil {
+		fatalf("%s", err)
+	}
+}
 
 func (gcToolchain) compiler() string {
 	return tool(archChar + "g")
@@ -1641,6 +1651,9 @@ func (gcToolchain) cc(b *builder, p *Package, objdir, ofile, cfile string) error
 type gccgoToolchain struct{}
 
 var gccgoBin, _ = exec.LookPath("gccgo")
+
+func (gccgoToolchain) init() {
+}
 
 func (gccgoToolchain) compiler() string {
 	return gccgoBin
@@ -1906,12 +1919,12 @@ func (b *builder) ccompilerCmd(envvar, defcmd, objdir string) []string {
 
 // gccArchArgs returns arguments to pass to gcc based on the architecture.
 func (b *builder) gccArchArgs() []string {
-	switch archChar {
-	case "8":
+	switch goarch {
+	case "386":
 		return []string{"-m32"}
-	case "6":
+	case "amd64":
 		return []string{"-m64"}
-	case "5":
+	case "arm":
 		return []string{"-marm"} // not thumb
 	}
 	return nil
