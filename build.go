@@ -994,7 +994,7 @@ func (b *builder) includeArgs(flag string, all []*action) []string {
 		if dir := a1.pkgdir; dir == a1.p.build.PkgRoot && !incMap[dir] {
 			incMap[dir] = true
 			if _, ok := buildToolchain.(gccgoToolchain); ok {
-				dir = filepath.Join(dir, "gccgo_"+goos+"_"+goarch)
+				dir = filepath.Join(dir, "gccgo")
 			} else {
 				dir = filepath.Join(dir, goos+"_"+goarch)
 				if buildRace {
