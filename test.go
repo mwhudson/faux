@@ -435,6 +435,9 @@ func (b *builder) test(p *Package) (buildAction, runAction, printAction *action,
 	var stk importStack
 	stk.push(p.ImportPath + "_test")
 	for _, path := range p.TestImports {
+		if _, ok := stdlib[path]; ok && buildContext.Compiler == "gccgo" {
+			continue
+		}
 		p1 := loadImport(path, p.Dir, &stk, p.build.TestImportPos[path])
 		if p1.Error != nil {
 			return nil, nil, nil, p1.Error
@@ -442,6 +445,9 @@ func (b *builder) test(p *Package) (buildAction, runAction, printAction *action,
 		imports = append(imports, p1)
 	}
 	for _, path := range p.XTestImports {
+		if _, ok := stdlib[path]; ok && buildContext.Compiler == "gccgo" {
+			continue
+		}
 		if path == p.ImportPath {
 			continue
 		}
@@ -557,15 +563,17 @@ func (b *builder) test(p *Package) (buildAction, runAction, printAction *action,
 
 	// The generated main also imports testing and regexp.
 	stk.push("testmain")
-	ptesting := loadImport("testing", "", &stk, nil)
-	if ptesting.Error != nil {
-		return nil, nil, nil, ptesting.Error
+	if buildContext.Compiler != "gccgo" {
+		ptesting := loadImport("testing", "", &stk, nil)
+		if ptesting.Error != nil {
+			return nil, nil, nil, ptesting.Error
+		}
+		pregexp := loadImport("regexp", "", &stk, nil)
+		if pregexp.Error != nil {
+			return nil, nil, nil, pregexp.Error
+		}
+		pmain.imports = append(pmain.imports, ptesting, pregexp)
 	}
-	pregexp := loadImport("regexp", "", &stk, nil)
-	if pregexp.Error != nil {
-		return nil, nil, nil, pregexp.Error
-	}
-	pmain.imports = append(pmain.imports, ptesting, pregexp)
 	computeStale(pmain)
 
 	if ptest != p {
